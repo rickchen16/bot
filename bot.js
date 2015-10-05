@@ -58,7 +58,6 @@ var modules = {
                                         meml = memory.local,
                                         ready = false,
                                         botURI = 'http://github.com/IWBTH/bot',
-                                        wikiURI = 'http://ehwiki.org/wiki',
                                         STOREKEY = 'IWBTH',
                                        
                                         timeout_handler = 0,
@@ -110,166 +109,6 @@ var modules = {
                                                         this.wikifail(false);
                                                 }
                                         },
-                                       
-                                        MCXHR = new Request.HTML({
-                                               
-                                                url: wikiURI+'/HentaiVerse_Bestiary',
-                                                method: 'get',
-                                                evalScripts: false,
-                                                filter: 'div#bodyContent > div.mw-content-ltr > table.wikitable',
-                                                timeout: 15000,
-                                               
-                                                wikifail: function(uncarriable)
-                                                {
-                                                        error('updateMonsterCache operation failed: Request timed out. Is '+
-                                                                anchor(uri, 'the wiki')+
-                                                                ' down for you?', uncarriable?'" class="uncarriable':'');
-                                                },
-                                               
-                                                onFailure: function(xhr)
-                                                {
-                                                        debugSay(console.error, 'XHR Failure:', xhr);
-                                                        this.wikifail(false);
-                                                },
-                                               
-                                                onTimeout: function(){ _timedout.call(this, 'updateMonsterCache'); },
-                                               
-                                                onSuccess: function(d1, d2)
-                                                {
-                                                        var mdata = {},
-                                                                prepare = function(str){ return (str.replace(/\s/gi, '').split(',').filter(function(i){ return i.length; }) || []).invoke('toLowerCase'); };
-                                                       
-                                                        d2.splice(0, 3).each(function(el, index)
-                                                        {
-                                                                el.getElements('tbody tr').splice(2).each(function(e)
-                                                                {
-                                                                        e = e.getChildren('td');
-                                                                        var name = e[0].get('text').trim().toLowerCase();
-                                                                       
-                                                                        mdata[name] = {
-                                                                                mid: e[1].get('text').trim(),
-                                                                                dmgtype: e[2].get('text').trim().toLowerCase()
-                                                                        };
-                                                                                                                                                               
-                                                                        if(index == 2)
-                                                                        {
-                                                                                mdata[name].resistances = prepare(e[7].get('text'));
-                                                                                mdata[name].weaknesses = prepare(e[8].get('text'));
-                                                                        }
-                                                                       
-                                                                        else
-                                                                        {
-                                                                                mdata[name].resistances = prepare(e[5].get('text'));
-                                                                                mdata[name].weaknesses = prepare(e[7].get('text')).combine(prepare(e[6].get('text')));
-                                                                        }
-                                                                       
-                                                                        mdata[name].resistances.reverse();
-                                                                });
-                                                        });
-                                                       
-                                                        debugSay('monsterCache updated successfully; return:', Object.clone(mdata));
-                                                        mems.set('monsterCache', mdata);
-                                                       
-                                                        if(this.funct)
-                                                        {
-                                                                this.funct(mdata);
-                                                                this.funct = null;
-                                                        }
-                                                }
-                                        }),
-                                       
-                                        SCXHR = new Request.HTML({
-                                               
-                                                url: wikiURI+'/Spells',
-                                                method: 'get',
-                                                evalScripts: false,
-                                                filter: 'div#bodyContent > div.mw-content-ltr > table.wikitable',
-                                                timeout: 15000,
-                                               
-                                                wikifail: function(uncarriable)
-                                                {
-                                                        error('updateSpellCache operation failed: Request timed out. Is '+
-                                                                anchor(uri, 'the wiki')+
-                                                                ' down for you?', uncarriable?'" class="uncarriable':'');
-                                                },
-                                               
-                                                onFailure: function(xhr)
-                                                {
-                                                        debugSay(console.error, 'XHR Failure:', xhr);
-                                                        this.wikifail(false);
-                                                },
-                                               
-                                                onTimeout: function(){ _timedout.call(this, 'updateSpellCache'); },
-                                               
-                                                onSuccess: function(d1, d2)
-                                                {
-                                                        var mdata = { pool: {}, elements: {}}, section = null;
-                                                       
-                                                        d2[1].getElements('tbody > tr').slice(1).each(function(item)
-                                                        {
-                                                                var data = item.getElement('th[colspan="6"]');
-                                                               
-                                                                if(data)
-                                                                {
-                                                                        section = data.getElement('span.mw-headline').get('id').trim().toLowerCase();
-                                                                        mdata.elements[section] = { 'aoe': [], 'st': [] };
-                                                                }
-                                                               
-                                                                else
-                                                                {
-                                                                        var name = item.getElements('th:not(th[rowspan="2"])').getLast().get('text').trim().toLowerCase(),
-                                                                                type = item.getElements('td')[0].get('text').contains('(AoE)') ? 'aoe' : 'st';
-                                                                       
-                                                                        mdata.pool[name] = { element: section, type: type };
-                                                                        mdata.elements[section][type].unshift(name);
-                                                                }
-                                                        });
-                                                       
-                                                        // Add the "elemental" element type (and stride its aoe and st elements correctly)
-                                                        var stride = 0, target = null;
-                                                        mdata.elements.elemental = { 'aoe': [], 'st': [] };
-                                                       
-                                                        var combinator = function(item, key)
-                                                        {
-                                                                var index = key*(stride+1)+stride;
-                                                                if(index > target.length)
-                                                                        target.push(item);
-                                                                else
-                                                                        target.splice(index, 0, item);
-                                                        };
-                                                       
-                                                        Object.each(mdata.elements, function(value, key)
-                                                        {
-                                                                if(['fire', 'elec', 'cold', 'wind'].contains(key))
-                                                                {
-                                                                        if(!stride)
-                                                                        {
-                                                                                mdata.elements.elemental.aoe = Array.clone(value.aoe);
-                                                                                mdata.elements.elemental.st = Array.clone(value.st);
-                                                                        }
-                                                                       
-                                                                        else
-                                                                        {
-                                                                                target = mdata.elements.elemental.aoe;
-                                                                                value.aoe.each(combinator);
-                                                                                target = mdata.elements.elemental.st;
-                                                                                value.st.each(combinator);
-                                                                        }
-                                                                       
-                                                                        stride++;
-                                                                }
-                                                        });
-                                                       
-                                                        debugSay('spellCache updated successfully; return:', Object.clone(mdata));
-                                                        mems.set('spellCache', mdata);
-                                                       
-                                                        if(this.funct)
-                                                        {
-                                                                this.funct(mdata);
-                                                                this.funct = null;
-                                                        }
-                                                }
-                                        }),
                                        
                                         defaultDirs = {
                                                 bravery: 55,
@@ -327,40 +166,6 @@ var modules = {
                                         {
                                                 mems.set('status', status);
                                                 debugSay('Status set to:', status);
-                                        },
-                                       
-                                        getMonsterCache = function(fn)
-                                        {
-                                                if(!mems.has('monsterCache'))
-                                                {
-                                                        MCXHR.retry = 0;
-                                                        MCXHR.funct = fn;
-                                                        MCXHR.send();
-                                                }
-                                               
-                                                else if(fn)
-                                                {
-                                                        var data = mems.get('monsterCache');
-                                                        debugSay('Using stored monsterCache; return:', Object.clone(data));
-                                                        fn(data);
-                                                }
-                                        },
-                                       
-                                        getSpellCache = function(fn)
-                                        {
-                                                if(!mems.has('spellCache'))
-                                                {
-                                                        SCXHR.retry = 0;
-                                                        SCXHR.funct = fn;
-                                                        SCXHR.send();
-                                                }
-                                               
-                                                else if(fn)
-                                                {
-                                                        var data = mems.get('spellCache');
-                                                        debugSay('Using stored spellCache; return:', Object.clone(data));
-                                                        fn(data);
-                                                }
                                         },
                                        
                                         debugSay = function()
@@ -1273,12 +1078,6 @@ var modules = {
                                        
                                         else if(cmd == 'stop')
                                         {
-                                                if(MCXHR.isRunning() || SCXHR.isRunning())
-                                                {
-                                                        _truedeath(MCXHR);
-                                                        _truedeath(SCXHR);
-                                                        success('XHR cache operations halted successfully');
-                                                }
                                                
                                                 if($$('._DG-countdown').length)
                                                 {
@@ -1341,9 +1140,6 @@ var modules = {
                                                         error('session is in a dirty state. Stop the bot and try again.');
                                                 else
                                                 {
-                                                        _truedeath(MCXHR);
-                                                        _truedeath(SCXHR);
-                                                       
                                                         mems.clear();
                                                         meml.clear();
                                                        
@@ -1402,28 +1198,6 @@ var modules = {
                                                         }
                                                        
                                                         else error('there is currently no active timeout');
-                                                }
-                                               
-                                                else if(args[0] == 'retry')
-                                                {
-                                                        if(MCXHR.timeout_handler || SCXHR.timeout_handler)
-                                                        {
-                                                                if(MCXHR.timeout_handler)
-                                                                {
-                                                                        clearTimeout(MCXHR.timeout_handler);
-                                                                        MCXHR.timeout_handler = 0;
-                                                                        MCXHR.send();
-                                                                }
-                                                               
-                                                                if(SCXHR.timeout_handler)
-                                                                {
-                                                                        clearTimeout(SCXHR.timeout_handler);
-                                                                        SCXHR.timeout_handler = 0;
-                                                                        SCXHR.send();
-                                                                }
-                                                        }
-                                                       
-                                                        else error('there are currently no pending XHR requests');
                                                 }
                                                
                                                 else invalid();
